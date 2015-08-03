@@ -1,474 +1,439 @@
-
 (function() {
+  var Humanize, LABELS_FOR_POWERS_OF_KILO, isArray, isFinite, isNaN, objectRef, timeFormats, toString;
 
-  // Baseline setup
-  // --------------
+  objectRef = new function() {};
 
-  // Establish the root object, `window` in the browser, or `global` on the server.
-  var root = this;
+  toString = objectRef.toString;
 
-  // Save the previous value of the `humanize` variable.
-  var previousHumanize = root.humanize;
-
-  var humanize = {};
-
-  if (typeof exports !== 'undefined') {
-    if (typeof module !== 'undefined' && module.exports) {
-      exports = module.exports = humanize;
-    }
-    exports.humanize = humanize;
-  } else {
-    if (typeof define === 'function' && define.amd) {
-      define('humanize', function() {
-        return humanize;
-      });
-    }
-    root.humanize = humanize;
-  }
-
-  humanize.noConflict = function() {
-    root.humanize = previousHumanize;
-    return this;
+  isNaN = function(value) {
+    return value !== value;
   };
 
-  humanize.pad = function(str, count, padChar, type) {
-    str += '';
-    if (!padChar) {
-      padChar = ' ';
-    } else if (padChar.length > 1) {
-      padChar = padChar.charAt(0);
-    }
-    type = (type === undefined) ? 'left' : 'right';
-
-    if (type === 'right') {
-      while (str.length < count) {
-        str = str + padChar;
-      }
-    } else {
-      // default to left
-      while (str.length < count) {
-        str = padChar + str;
-      }
-    }
-
-    return str;
+  isFinite = function(value) {
+    return ((typeof window !== "undefined" && window !== null ? window.isFinite : void 0) || global.isFinite)(value) && !isNaN(parseFloat(value));
   };
 
-  // gets current unix time
-  humanize.time = function() {
-    return new Date().getTime() / 1000;
+  isArray = function(value) {
+    return toString.call(value) === '[object Array]';
   };
 
-  /**
-   * PHP-inspired date
-   */
+  timeFormats = [
+    {
+      name: 'second',
+      value: 1e3
+    }, {
+      name: 'minute',
+      value: 6e4
+    }, {
+      name: 'hour',
+      value: 36e5
+    }, {
+      name: 'day',
+      value: 864e5
+    }, {
+      name: 'week',
+      value: 6048e5
+    }
+  ];
 
-                        /*  jan  feb  mar  apr  may  jun  jul  aug  sep  oct  nov  dec */
-  var dayTableCommon = [ 0,   0,  31,  59,  90, 120, 151, 181, 212, 243, 273, 304, 334 ];
-  var dayTableLeap   = [ 0,   0,  31,  60,  91, 121, 152, 182, 213, 244, 274, 305, 335 ];
-  // var mtable_common[13] = {  0,  31,  28,  31,  30,  31,  30,  31,  31,  30,  31,  30,  31 };
-  // static int ml_table_leap[13]   = {  0,  31,  29,  31,  30,  31,  30,  31,  31,  30,  31,  30,  31 };
+  Humanize = {};
 
+  Humanize.intword = function(number, charWidth, decimals) {
+    if (decimals == null) {
+      decimals = 2;
+    }
+    /*
+        # This method is deprecated. Please use compactInteger instead.
+        # intword will be going away in the next major version.
+    */
 
-  humanize.date = function(format, timestamp) {
-    var jsdate = ((timestamp === undefined) ? new Date() : // Not provided
-                  (timestamp instanceof Date) ? new Date(timestamp) : // JS Date()
-                  new Date(timestamp * 1000) // UNIX timestamp (auto-convert to int)
-                 );
-
-    var formatChr = /\\?([a-z])/gi;
-    var formatChrCb = function (t, s) {
-      return f[t] ? f[t]() : s;
-    };
-
-    var shortDayTxt = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    var monthTxt = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-    var f = {
-      /* Day */
-      // Day of month w/leading 0; 01..31
-      d: function () { return humanize.pad(f.j(), 2, '0'); },
-
-      // Shorthand day name; Mon..Sun
-      D: function () { return f.l().slice(0, 3); },
-
-      // Day of month; 1..31
-      j: function () { return jsdate.getDate(); },
-
-      // Full day name; Monday..Sunday
-      l: function () { return shortDayTxt[f.w()]; },
-
-      // ISO-8601 day of week; 1[Mon]..7[Sun]
-      N: function () { return f.w() || 7; },
-
-      // Ordinal suffix for day of month; st, nd, rd, th
-      S: function () {
-        var j = f.j();
-        return j > 4 && j < 21 ? 'th' : {1: 'st', 2: 'nd', 3: 'rd'}[j % 10] || 'th';
-      },
-
-      // Day of week; 0[Sun]..6[Sat]
-      w: function () { return jsdate.getDay(); },
-
-      // Day of year; 0..365
-      z: function () {
-        return (f.L() ? dayTableLeap[f.n()] : dayTableCommon[f.n()]) + f.j() - 1;
-      },
-
-      /* Week */
-      // ISO-8601 week number
-      W: function () {
-        // days between midweek of this week and jan 4
-        // (f.z() - f.N() + 1 + 3.5) - 3
-        var midWeekDaysFromJan4 = f.z() - f.N() + 1.5;
-        // 1 + number of weeks + rounded week
-        return humanize.pad(1 + Math.floor(Math.abs(midWeekDaysFromJan4) / 7) + (midWeekDaysFromJan4 % 7 > 3.5 ? 1 : 0), 2, '0');
-      },
-
-      /* Month */
-      // Full month name; January..December
-      F: function () { return monthTxt[jsdate.getMonth()]; },
-
-      // Month w/leading 0; 01..12
-      m: function () { return humanize.pad(f.n(), 2, '0'); },
-
-      // Shorthand month name; Jan..Dec
-      M: function () { return f.F().slice(0, 3); },
-
-      // Month; 1..12
-      n: function () { return jsdate.getMonth() + 1; },
-
-      // Days in month; 28..31
-      t: function () { return (new Date(f.Y(), f.n(), 0)).getDate(); },
-
-      /* Year */
-      // Is leap year?; 0 or 1
-      L: function () { return new Date(f.Y(), 1, 29).getMonth() === 1 ? 1 : 0; },
-
-      // ISO-8601 year
-      o: function () {
-        var n = f.n();
-        var W = f.W();
-        return f.Y() + (n === 12 && W < 9 ? -1 : n === 1 && W > 9);
-      },
-
-      // Full year; e.g. 1980..2010
-      Y: function () { return jsdate.getFullYear(); },
-
-      // Last two digits of year; 00..99
-      y: function () { return (String(f.Y())).slice(-2); },
-
-      /* Time */
-      // am or pm
-      a: function () { return jsdate.getHours() > 11 ? 'pm' : 'am'; },
-
-      // AM or PM
-      A: function () { return f.a().toUpperCase(); },
-
-      // Swatch Internet time; 000..999
-      B: function () {
-        var unixTime = jsdate.getTime() / 1000;
-        var secondsPassedToday = unixTime % 86400 + 3600; // since it's based off of UTC+1
-        if (secondsPassedToday < 0) { secondsPassedToday += 86400; }
-        var beats = ((secondsPassedToday) / 86.4) % 1000;
-        if (unixTime < 0) {
-          return Math.ceil(beats);
-        }
-        return Math.floor(beats);
-      },
-
-      // 12-Hours; 1..12
-      g: function () { return f.G() % 12 || 12; },
-
-      // 24-Hours; 0..23
-      G: function () { return jsdate.getHours(); },
-
-      // 12-Hours w/leading 0; 01..12
-      h: function () { return humanize.pad(f.g(), 2, '0'); },
-
-      // 24-Hours w/leading 0; 00..23
-      H: function () { return humanize.pad(f.G(), 2, '0'); },
-
-      // Minutes w/leading 0; 00..59
-      i: function () { return humanize.pad(jsdate.getMinutes(), 2, '0'); },
-
-      // Seconds w/leading 0; 00..59
-      s: function () { return humanize.pad(jsdate.getSeconds(), 2, '0'); },
-
-      // Microseconds; 000000-999000
-      u: function () { return humanize.pad(jsdate.getMilliseconds() * 1000, 6, '0'); },
-
-      // Whether or not the date is in daylight savings time
-      /*
-      I: function () {
-        // Compares Jan 1 minus Jan 1 UTC to Jul 1 minus Jul 1 UTC.
-        // If they are not equal, then DST is observed.
-        var Y = f.Y();
-        return 0 + ((new Date(Y, 0) - Date.UTC(Y, 0)) !== (new Date(Y, 6) - Date.UTC(Y, 6)));
-      },
-      */
-
-      // Difference to GMT in hour format; e.g. +0200
-      O: function () {
-        var tzo = jsdate.getTimezoneOffset();
-        var tzoNum = Math.abs(tzo);
-        return (tzo > 0 ? '-' : '+') + humanize.pad(Math.floor(tzoNum / 60) * 100 + tzoNum % 60, 4, '0');
-      },
-
-      // Difference to GMT w/colon; e.g. +02:00
-      P: function () {
-        var O = f.O();
-        return (O.substr(0, 3) + ':' + O.substr(3, 2));
-      },
-
-      // Timezone offset in seconds (-43200..50400)
-      Z: function () { return -jsdate.getTimezoneOffset() * 60; },
-
-      // Full Date/Time, ISO-8601 date
-      c: function () { return 'Y-m-d\\TH:i:sP'.replace(formatChr, formatChrCb); },
-
-      // RFC 2822
-      r: function () { return 'D, d M Y H:i:s O'.replace(formatChr, formatChrCb); },
-
-      // Seconds since UNIX epoch
-      U: function () { return jsdate.getTime() / 1000 || 0; }
-    };    
-
-    return format.replace(formatChr, formatChrCb);
+    return Humanize.compactInteger(number, decimals);
   };
 
-
-  /**
-   * format number by adding thousands separaters and significant digits while rounding
-   */
-  humanize.numberFormat = function(number, decimals, decPoint, thousandsSep) {
-    decimals = isNaN(decimals) ? 2 : Math.abs(decimals);
-    decPoint = (decPoint === undefined) ? '.' : decPoint;
-    thousandsSep = (thousandsSep === undefined) ? ',' : thousandsSep;
-
-    var sign = number < 0 ? '-' : '';
-    number = Math.abs(+number || 0);
-
-    var intPart = parseInt(number.toFixed(decimals), 10) + '';
-    var j = intPart.length > 3 ? intPart.length % 3 : 0;
-
-    return sign + (j ? intPart.substr(0, j) + thousandsSep : '') + intPart.substr(j).replace(/(\d{3})(?=\d)/g, '$1' + thousandsSep) + (decimals ? decPoint + Math.abs(number - intPart).toFixed(decimals).slice(2) : '');
-  };
-
-
-  /**
-   * For dates that are the current day or within one day, return 'today', 'tomorrow' or 'yesterday', as appropriate.
-   * Otherwise, format the date using the passed in format string.
-   *
-   * Examples (when 'today' is 17 Feb 2007):
-   * 16 Feb 2007 becomes yesterday.
-   * 17 Feb 2007 becomes today.
-   * 18 Feb 2007 becomes tomorrow.
-   * Any other day is formatted according to given argument or the DATE_FORMAT setting if no argument is given.
-   */
-  humanize.naturalDay = function(timestamp, format) {
-    timestamp = (timestamp === undefined) ? humanize.time() : timestamp;
-    format = (format === undefined) ? 'Y-m-d' : format;
-
-    var oneDay = 86400;
-    var d = new Date();
-    var today = (new Date(d.getFullYear(), d.getMonth(), d.getDate())).getTime() / 1000;
-
-    if (timestamp < today && timestamp >= today - oneDay) {
-      return 'yesterday';
-    } else if (timestamp >= today && timestamp < today + oneDay) {
-      return 'today';
-    } else if (timestamp >= today + oneDay && timestamp < today + 2 * oneDay) {
-      return 'tomorrow';
+  Humanize.compactInteger = function(input, decimals) {
+    var bigNumPrefixes, decimalIndex, decimalPart, decimalPartArray, length, number, numberLength, numberLengths, output, outputNumber, signString, unsignedNumber, unsignedNumberCharacterArray, unsignedNumberString, wholePart, wholePartArray, _i, _len, _length;
+    if (decimals == null) {
+      decimals = 0;
     }
-
-    return humanize.date(format, timestamp);
-  };
-
-  /**
-   * returns a string representing how many seconds, minutes or hours ago it was or will be in the future
-   * Will always return a relative time, most granular of seconds to least granular of years. See unit tests for more details
-   */
-  humanize.relativeTime = function(timestamp) {
-    timestamp = (timestamp === undefined) ? humanize.time() : timestamp;
-
-    var currTime = humanize.time();
-    var timeDiff = currTime - timestamp;
-
-    // within 2 seconds
-    if (timeDiff < 2 && timeDiff > -2) {
-      return (timeDiff >= 0 ? 'just ' : '') + 'now';
+    decimals = Math.max(decimals, 0);
+    number = parseInt(input, 10);
+    signString = number < 0 ? "-" : "";
+    unsignedNumber = Math.abs(number);
+    unsignedNumberString = "" + unsignedNumber;
+    numberLength = unsignedNumberString.length;
+    numberLengths = [13, 10, 7, 4];
+    bigNumPrefixes = ['T', 'B', 'M', 'k'];
+    if (unsignedNumber < 1000) {
+      return "" + signString + unsignedNumberString;
     }
-
-    // within a minute
-    if (timeDiff < 60 && timeDiff > -60) {
-      return (timeDiff >= 0 ? Math.floor(timeDiff) + ' seconds ago' : 'in ' + Math.floor(-timeDiff) + ' seconds');
+    if (numberLength > numberLengths[0] + 3) {
+      return number.toExponential(decimals).replace('e+', 'x10^');
     }
-
-    // within 2 minutes
-    if (timeDiff < 120 && timeDiff > -120) {
-      return (timeDiff >= 0 ? 'about a minute ago' : 'in about a minute');
-    }
-
-    // within an hour
-    if (timeDiff < 3600 && timeDiff > -3600) {
-      return (timeDiff >= 0 ? Math.floor(timeDiff / 60) + ' minutes ago' : 'in ' + Math.floor(-timeDiff / 60) + ' minutes');
-    }
-
-    // within 2 hours
-    if (timeDiff < 7200 && timeDiff > -7200) {
-      return (timeDiff >= 0 ? 'about an hour ago' : 'in about an hour');
-    }
-
-    // within 24 hours
-    if (timeDiff < 86400 && timeDiff > -86400) {
-      return (timeDiff >= 0 ? Math.floor(timeDiff / 3600) + ' hours ago' : 'in ' + Math.floor(-timeDiff / 3600) + ' hours');
-    }
-
-    // within 2 days
-    var days2 = 2 * 86400;
-    if (timeDiff < days2 && timeDiff > -days2) {
-      return (timeDiff >= 0 ? '1 day ago' : 'in 1 day');
-    }
-
-    // within 29 days
-    var days29 = 29 * 86400;
-    if (timeDiff < days29 && timeDiff > -days29) {
-      return (timeDiff >= 0 ? Math.floor(timeDiff / 86400) + ' days ago' : 'in ' + Math.floor(-timeDiff / 86400) + ' days');
-    }
-
-    // within 60 days
-    var days60 = 60 * 86400;
-    if (timeDiff < days60 && timeDiff > -days60) {
-      return (timeDiff >= 0 ? 'about a month ago' : 'in about a month');
-    }
-
-    var currTimeYears = parseInt(humanize.date('Y', currTime), 10);
-    var timestampYears = parseInt(humanize.date('Y', timestamp), 10);
-    var currTimeMonths = currTimeYears * 12 + parseInt(humanize.date('n', currTime), 10);
-    var timestampMonths = timestampYears * 12 + parseInt(humanize.date('n', timestamp), 10);
-
-    // within a year
-    var monthDiff = currTimeMonths - timestampMonths;
-    if (monthDiff < 12 && monthDiff > -12) {
-      return (monthDiff >= 0 ? monthDiff + ' months ago' : 'in ' + (-monthDiff) + ' months');
-    }
-
-    var yearDiff = currTimeYears - timestampYears;
-    if (yearDiff < 2 && yearDiff > -2) {
-      return (yearDiff >= 0 ? 'a year ago' : 'in a year');
-    }
-
-    return (yearDiff >= 0 ? yearDiff + ' years ago' : 'in ' + (-yearDiff) + ' years');
-  };
-
-  /**
-   * Converts an integer to its ordinal as a string.
-   *
-   * 1 becomes 1st
-   * 2 becomes 2nd
-   * 3 becomes 3rd etc
-   */
-  humanize.ordinal = function(number) {
-    number = parseInt(number, 10);
-    number = isNaN(number) ? 0 : number;
-    var sign = number < 0 ? '-' : '';
-    number = Math.abs(number);
-    var tens = number % 100;
-
-    return sign + number + (tens > 4 && tens < 21 ? 'th' : {1: 'st', 2: 'nd', 3: 'rd'}[number % 10] || 'th');
-  };
-
-  /**
-   * Formats the value like a 'human-readable' file size (i.e. '13 KB', '4.1 MB', '102 bytes', etc).
-   *
-   * For example:
-   * If value is 123456789, the output would be 117.7 MB.
-   */
-  humanize.filesize = function(filesize, kilo, decimals, decPoint, thousandsSep, suffixSep) {
-    kilo = (kilo === undefined) ? 1024 : kilo;
-    if (filesize <= 0) { return '0 bytes'; }
-    if (filesize < kilo && decimals === undefined) { decimals = 0; }
-    if (suffixSep === undefined) { suffixSep = ' '; }
-    return humanize.intword(filesize, ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB'], kilo, decimals, decPoint, thousandsSep, suffixSep);
-  };
-
-  /**
-   * Formats the value like a 'human-readable' number (i.e. '13 K', '4.1 M', '102', etc).
-   *
-   * For example:
-   * If value is 123456789, the output would be 117.7 M.
-   */
-  humanize.intword = function(number, units, kilo, decimals, decPoint, thousandsSep, suffixSep) {
-    var humanized, unit;
-
-    units = units || ['', 'K', 'M', 'B', 'T'],
-    unit = units.length - 1,
-    kilo = kilo || 1000,
-    decimals = isNaN(decimals) ? 2 : Math.abs(decimals),
-    decPoint = decPoint || '.',
-    thousandsSep = thousandsSep || ',',
-    suffixSep = suffixSep || '';
-
-    for (var i=0; i < units.length; i++) {
-      if (number < Math.pow(kilo, i+1)) {
-        unit = i;
+    for (_i = 0, _len = numberLengths.length; _i < _len; _i++) {
+      _length = numberLengths[_i];
+      if (numberLength >= _length) {
+        length = _length;
         break;
       }
     }
-    humanized = number / Math.pow(kilo, unit);
-
-    var suffix = units[unit] ? suffixSep + units[unit] : '';
-    return humanize.numberFormat(humanized, decimals, decPoint, thousandsSep) + suffix;
+    decimalIndex = numberLength - length + 1;
+    unsignedNumberCharacterArray = unsignedNumberString.split("");
+    wholePartArray = unsignedNumberCharacterArray.slice(0, decimalIndex);
+    decimalPartArray = unsignedNumberCharacterArray.slice(decimalIndex, decimalIndex + decimals + 1);
+    wholePart = wholePartArray.join("");
+    decimalPart = decimalPartArray.join("");
+    if (decimalPart.length < decimals) {
+      decimalPart += "" + (Array(decimals - decimalPart.length + 1).join('0'));
+    }
+    if (decimals === 0) {
+      output = "" + signString + wholePart + bigNumPrefixes[numberLengths.indexOf(length)];
+    } else {
+      outputNumber = (+("" + wholePart + "." + decimalPart)).toFixed(decimals);
+      output = "" + signString + outputNumber + bigNumPrefixes[numberLengths.indexOf(length)];
+    }
+    return output;
   };
 
-  /**
-   * Replaces line breaks in plain text with appropriate HTML
-   * A single newline becomes an HTML line break (<br />) and a new line followed by a blank line becomes a paragraph break (</p>).
-   * 
-   * For example:
-   * If value is Joel\nis a\n\nslug, the output will be <p>Joel<br />is a</p><p>slug</p>
-   */
-  humanize.linebreaks = function(str) {
-    // remove beginning and ending newlines
-    str = str.replace(/^([\n|\r]*)/, '');
-    str = str.replace(/([\n|\r]*)$/, '');
-
-    // normalize all to \n
-    str = str.replace(/(\r\n|\n|\r)/g, "\n");
-
-    // any consecutive new lines more than 2 gets turned into p tags
-    str = str.replace(/(\n{2,})/g, '</p><p>');
-
-    // any that are singletons get turned into br
-    str = str.replace(/\n/g, '<br />');
-    return '<p>' + str + '</p>';
+  Humanize.intcomma = Humanize.intComma = function(number, decimals) {
+    if (decimals == null) {
+      decimals = 0;
+    }
+    return Humanize.formatNumber(number, decimals);
   };
 
-  /**
-   * Converts all newlines in a piece of plain text to HTML line breaks (<br />).
-   */
-  humanize.nl2br = function(str) {
-    return str.replace(/(\r\n|\n|\r)/g, '<br />');
+  LABELS_FOR_POWERS_OF_KILO = {
+    "P": Math.pow(2, 50),
+    "T": Math.pow(2, 40),
+    "G": Math.pow(2, 30),
+    "M": Math.pow(2, 20)
   };
 
-  /**
-   * Truncates a string if it is longer than the specified number of characters.
-   * Truncated strings will end with a translatable ellipsis sequence ('…').
-   */
-  humanize.truncatechars = function(string, length) {
-    if (string.length <= length) { return string; }
-    return string.substr(0, length) + '…';
+  Humanize.filesize = Humanize.fileSize = function(filesize) {
+    var label, minnum;
+    for (label in LABELS_FOR_POWERS_OF_KILO) {
+      minnum = LABELS_FOR_POWERS_OF_KILO[label];
+      if (filesize >= minnum) {
+        return Humanize.formatNumber(filesize / minnum, 2, "") + " " + label + "B";
+      }
+    }
+    if (filesize >= 1024) {
+      return Humanize.formatNumber(filesize / 1024, 0) + " KB";
+    }
+    return Humanize.formatNumber(filesize, 0) + Humanize.pluralize(filesize, " byte");
   };
 
-  /**
-   * Truncates a string after a certain number of words.
-   * Newlines within the string will be removed.
-   */
-  humanize.truncatewords = function(string, numWords) {
-    var words = string.split(' ');
-    if (words.length < numWords) { return string; }
-    return words.slice(0, numWords).join(' ') + '…';
+  Humanize.formatNumber = function(number, precision, thousand, decimal) {
+    var base, commas, decimals, firstComma, mod, negative, usePrecision;
+    if (precision == null) {
+      precision = 0;
+    }
+    if (thousand == null) {
+      thousand = ",";
+    }
+    if (decimal == null) {
+      decimal = ".";
+    }
+    firstComma = function(number, thousand, position) {
+      if (position) {
+        return number.substr(0, position) + thousand;
+      } else {
+        return "";
+      }
+    };
+    commas = function(number, thousand, position) {
+      return number.substr(position).replace(/(\d{3})(?=\d)/g, "$1" + thousand);
+    };
+    decimals = function(number, decimal, usePrecision) {
+      if (usePrecision) {
+        return decimal + Humanize.toFixed(Math.abs(number), usePrecision).split(".")[1];
+      } else {
+        return "";
+      }
+    };
+    usePrecision = Humanize.normalizePrecision(precision);
+    negative = number < 0 && "-" || "";
+    base = parseInt(Humanize.toFixed(Math.abs(number || 0), usePrecision), 10) + "";
+    mod = base.length > 3 ? base.length % 3 : 0;
+    return negative + firstComma(base, thousand, mod) + commas(base, thousand, mod) + decimals(number, decimal, usePrecision);
   };
+
+  Humanize.toFixed = function(value, precision) {
+    var power;
+    if (precision == null) {
+      precision = Humanize.normalizePrecision(precision, 0);
+    }
+    power = Math.pow(10, precision);
+    return (Math.round(value * power) / power).toFixed(precision);
+  };
+
+  Humanize.normalizePrecision = function(value, base) {
+    value = Math.round(Math.abs(value));
+    if (isNaN(value)) {
+      return base;
+    } else {
+      return value;
+    }
+  };
+
+  Humanize.ordinal = function(value) {
+    var end, leastSignificant, number, specialCase;
+    number = parseInt(value, 10);
+    if (number === 0) {
+      return value;
+    }
+    specialCase = number % 100;
+    if (specialCase === 11 || specialCase === 12 || specialCase === 13) {
+      return "" + number + "th";
+    }
+    leastSignificant = number % 10;
+    switch (leastSignificant) {
+      case 1:
+        end = "st";
+        break;
+      case 2:
+        end = "nd";
+        break;
+      case 3:
+        end = "rd";
+        break;
+      default:
+        end = "th";
+    }
+    return "" + number + end;
+  };
+
+  Humanize.times = function(value, overrides) {
+    var number, smallTimes, _ref;
+    if (overrides == null) {
+      overrides = {};
+    }
+    if (isFinite(value) && value >= 0) {
+      number = parseFloat(value);
+      smallTimes = ['never', 'once', 'twice'];
+      if (overrides[number] != null) {
+        return "" + overrides[number];
+      } else {
+        return "" + (((_ref = smallTimes[number]) != null ? _ref.toString() : void 0) || number.toString() + ' times');
+      }
+    }
+  };
+
+  Humanize.pluralize = function(number, singular, plural) {
+    if (!((number != null) && (singular != null))) {
+      return;
+    }
+    if (plural == null) {
+      plural = singular + "s";
+    }
+    if (parseInt(number, 10) === 1) {
+      return singular;
+    } else {
+      return plural;
+    }
+  };
+
+  Humanize.truncate = function(str, length, ending) {
+    if (length == null) {
+      length = 100;
+    }
+    if (ending == null) {
+      ending = '...';
+    }
+    if (str.length > length) {
+      return str.substring(0, length - ending.length) + ending;
+    } else {
+      return str;
+    }
+  };
+
+  Humanize.truncatewords = Humanize.truncateWords = function(string, length) {
+    var array, i, result;
+    array = string.split(" ");
+    result = "";
+    i = 0;
+    while (i < length) {
+      if (array[i] != null) {
+        result += "" + array[i] + " ";
+      }
+      i++;
+    }
+    if (array.length > length) {
+      return result += "...";
+    }
+  };
+
+  Humanize.truncatenumber = Humanize.boundedNumber = function(num, bound, ending) {
+    var result;
+    if (bound == null) {
+      bound = 100;
+    }
+    if (ending == null) {
+      ending = "+";
+    }
+    result = null;
+    if (isFinite(num) && isFinite(bound)) {
+      if (num > bound) {
+        result = bound + ending;
+      }
+    }
+    return (result || num).toString();
+  };
+
+  Humanize.oxford = function(items, limit, limitStr) {
+    var extra, limitIndex, numItems;
+    numItems = items.length;
+    if (numItems < 2) {
+      return "" + items;
+    } else if (numItems === 2) {
+      return items.join(' and ');
+    } else if ((limit != null) && numItems > limit) {
+      extra = numItems - limit;
+      limitIndex = limit;
+      if (limitStr == null) {
+        limitStr = ", and " + extra + " " + (Humanize.pluralize(extra, 'other'));
+      }
+    } else {
+      limitIndex = -1;
+      limitStr = ", and " + items[numItems - 1];
+    }
+    return items.slice(0, limitIndex).join(', ') + limitStr;
+  };
+
+  Humanize.dictionary = function(object, joiner, separator) {
+    var defs, key, result, val;
+    if (joiner == null) {
+      joiner = ' is ';
+    }
+    if (separator == null) {
+      separator = ', ';
+    }
+    result = '';
+    if ((object != null) && typeof object === 'object' && Object.prototype.toString.call(object) !== '[object Array]') {
+      defs = [];
+      for (key in object) {
+        val = object[key];
+        defs.push("" + key + joiner + val);
+      }
+      result = defs.join(separator);
+    }
+    return result;
+  };
+
+  Humanize.frequency = function(list, verb) {
+    var len, str, times;
+    if (!isArray(list)) {
+      return;
+    }
+    len = list.length;
+    times = Humanize.times(len);
+    if (len === 0) {
+      str = "" + times + " " + verb;
+    } else {
+      str = "" + verb + " " + times;
+    }
+    return str;
+  };
+
+  Humanize.pace = function(value, intervalMs, unit) {
+    var f, prefix, rate, relativePace, roundedPace, timeUnit, _i, _len;
+    if (unit == null) {
+      unit = 'time';
+    }
+    if (value === 0 || intervalMs === 0) {
+      return "No " + (Humanize.pluralize(unit));
+    }
+    prefix = 'Approximately';
+    timeUnit = null;
+    rate = value / intervalMs;
+    for (_i = 0, _len = timeFormats.length; _i < _len; _i++) {
+      f = timeFormats[_i];
+      relativePace = rate * f.value;
+      if (relativePace > 1) {
+        timeUnit = f.name;
+        break;
+      }
+    }
+    if (!timeUnit) {
+      prefix = 'Less than';
+      relativePace = 1;
+      timeUnit = timeFormats[timeFormats.length - 1].name;
+    }
+    roundedPace = Math.round(relativePace);
+    unit = Humanize.pluralize(roundedPace, unit);
+    return "" + prefix + " " + roundedPace + " " + unit + " per " + timeUnit;
+  };
+
+  Humanize.nl2br = function(string, replacement) {
+    if (replacement == null) {
+      replacement = '<br/>';
+    }
+    return string.replace(/\n/g, replacement);
+  };
+
+  Humanize.br2nl = function(string, replacement) {
+    if (replacement == null) {
+      replacement = '\r\n';
+    }
+    return string.replace(/\<br\s*\/?\>/g, replacement);
+  };
+
+  Humanize.capitalize = function(string, downCaseTail) {
+    if (downCaseTail == null) {
+      downCaseTail = false;
+    }
+    return "" + (string.charAt(0).toUpperCase()) + (downCaseTail ? string.slice(1).toLowerCase() : string.slice(1));
+  };
+
+  Humanize.capitalizeAll = function(string) {
+    return string.replace(/(?:^|\s)\S/g, function(a) {
+      return a.toUpperCase();
+    });
+  };
+
+  Humanize.titlecase = Humanize.titleCase = function(string) {
+    var doTitleCase, internalCaps, smallWords, splitOnHyphensRegex, splitOnWhiteSpaceRegex,
+      _this = this;
+    smallWords = /\b(a|an|and|at|but|by|de|en|for|if|in|of|on|or|the|to|via|vs?\.?)\b/i;
+    internalCaps = /\S+[A-Z]+\S*/;
+    splitOnWhiteSpaceRegex = /\s+/;
+    splitOnHyphensRegex = /-/;
+    doTitleCase = function(_string, hyphenated, firstOrLast) {
+      var index, stringArray, titleCasedArray, word, _i, _len;
+      if (hyphenated == null) {
+        hyphenated = false;
+      }
+      if (firstOrLast == null) {
+        firstOrLast = true;
+      }
+      titleCasedArray = [];
+      stringArray = _string.split(hyphenated ? splitOnHyphensRegex : splitOnWhiteSpaceRegex);
+      for (index = _i = 0, _len = stringArray.length; _i < _len; index = ++_i) {
+        word = stringArray[index];
+        if (word.indexOf('-') !== -1) {
+          titleCasedArray.push(doTitleCase(word, true, index === 0 || index === stringArray.length - 1));
+          continue;
+        }
+        if (firstOrLast && (index === 0 || index === stringArray.length - 1)) {
+          titleCasedArray.push(internalCaps.test(word) ? word : Humanize.capitalize(word));
+          continue;
+        }
+        if (internalCaps.test(word)) {
+          titleCasedArray.push(word);
+        } else if (smallWords.test(word)) {
+          titleCasedArray.push(word.toLowerCase());
+        } else {
+          titleCasedArray.push(Humanize.capitalize(word));
+        }
+      }
+      return titleCasedArray.join(hyphenated ? '-' : ' ');
+    };
+    return doTitleCase(string);
+  };
+
+  this.Humanize = Humanize;
+
+  if (typeof module !== "undefined" && module !== null) {
+    module.exports = Humanize;
+  }
 
 }).call(this);

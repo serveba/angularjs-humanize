@@ -5,32 +5,26 @@
     filter('humanizeFilesize', function () {
       return function ( input ) {
         if ( isNaN(input) ) { return input; }
-        return humanize.filesize(input);
+        return Humanize.fileSize(input);
       };
     }).
     filter('humanizeOrdinal', function () {
       return function ( input ) {
         if ( isNaN(input) ) { return input; }
-        return humanize.ordinal(input);
+        return Humanize.ordinal(input);
       };
     }).
     filter('humanizeInt', function () {
       return function ( input ) {
-        if ( parseInt(input) !== input ) { return input; }
-        return humanize.numberFormat(input, 0);
+        if ( isNaN(parseInt(input, 10))) { return input; }
+        return Humanize.formatNumber(parseInt(input,10), 0);
       };
     }).
     filter('humanizeNaturalDay', function () {
       return function ( input ) {
         if ( isNaN(input) ) { return input; }
-        return humanize.naturalDay(input);
+        return Humanize.naturalDay(input);
       };
-    }).
-    filter('humanizeRelativeTime', function () {
-      return function ( input ) {
-        if ( isNaN(input) ) { return input; }
-        return humanize.relativeTime(input);
-      };
-    });
+    })
 
 }( angular ));

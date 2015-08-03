@@ -9,12 +9,12 @@
                 {
                     name: 'bruce_timm.png',
                     filesize: 230757,
-                    uploaded: 1405652728
+                    //uploaded: 1405652728
                 },
                 {
                     name: 'joker.gif',
-                    filesize: '76160',
-                    uploaded: '1393729528.33'
+                    filesize: '76160'//,
+                    //uploaded: '1393729528.33'
                 }
              ];
          }]
